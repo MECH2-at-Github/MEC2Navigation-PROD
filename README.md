@@ -14,5 +14,5 @@ Install instructions:
 * 'Open in a new tab' Case number field, along with two destination pages (Notes, Overview) at the top right of the Navigation buttons
   * Pressing enter after typing a case number selects 'CaseOverview'
 * Period navigation buttons change periods without the select dropdown
-  * Earlier + Submit, Earlier [Dropdown] Later, Later + Submit - « ‹ [Dropdown] › »
+  * « ‹ [Daterange - Dropdown] › »   (Previous+Submit, Previous [Dropdown] Next, Next+Submit)
 * Period order in the dropdown is reversed to be most recent on top, and future periods are displayed without needing to scroll
