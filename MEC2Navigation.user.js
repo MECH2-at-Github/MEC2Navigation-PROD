@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         MEC2Navigation
+// @name         mec2navigation
 // @namespace    http://github.com/MECH2-at-Github
-// @version      0.1.1
 // @description  Add functionality to MEC2 to improve navigation
 // @author       MECH2
 // @match        mec2.childcare.dhs.state.mn.us/*
+// @version      0.1.2
 // ==/UserScript==
 /* globals jQuery, $, waitForKeyElements */
 
@@ -12,15 +12,34 @@
 // ====================================================================================================
 // /////////////////////////////////// CUSTOM_NAVIGATION SECTION START \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 // ====================================================================================================
+function isDeveloperModeEnabled() {
+    let devModeWarning = localStorage.getItem('MECH2.devModeWarning')
+    if (!devModeWarning) {
+        document.querySelector('div.container:has(form)')?.insertAdjacentHTML('afterbegin', `
+        <div id="devModeWarningBox" class="error_alertbox_new">
+            <strong class="rederrortext">Notice: <a style="text-decoration: underline;" href="https://www.tampermonkey.net/changelog.php?show=dhdg" target="_blank">Tampermonkey</a> now requires "Developer Mode" enabled in Chrome. ⋮ › Extension › Manage Extensions (upper right corner).</strong>
+            <span style="float: right !important; cursor: pointer;" id="devModeWarningClose">✖</span>
+        </div>`)
+        document.getElementById('devModeWarningClose').addEventListener('click', function() {
+            localStorage.setItem('MECH2.devModeWarning', true)
+            document.getElementById('devModeWarningBox').remove()
+        })
+    }
+}
+isDeveloperModeEnabled()
 console.time('MEC2Functions')
-document.getElementById('help')?.insertAdjacentHTML('afterend', '<a href="/ChildCare/PrivacyAndSystemSecurity.htm" target="_blank" style="margin-left: 10px;">' + GM_info.script.name + ' v' + GM_info.script.version + '</a>')
+document.getElementById('help')?.insertAdjacentHTML('afterend', '<a href="/ChildCare/PrivacyAndSystemSecurity.htm?from=mec2functions" target="_blank" style="margin-left: 10px;">' + GM_info.script.name + ' v' + GM_info.script.version + '</a>')
 let pageWrap = document.querySelector('#page-wrap')
 let notEditMode = document.querySelectorAll('#page-wrap').length;
 let iFramed = window.location !== window.parent.location ? 1 : 0
 let greenline = document.querySelector(".line_mn_green")
+let focusEle = "blank"
+let caseId = document.getElementById('caseId')?.value ?? undefined
+let providerId = caseId ?? document.getElementById('providerId')?.value
+let caseIdORproviderId = caseId ?? providerId
 greenline.id = "greenline"
 greenline.closest('.container')?.insertAdjacentHTML('afterend', `
-<div id="primaryNavigation" class="container primary-navigation">
+<nav class="primary-navigation container">
     <div class="primary-navigation-row">
         <div id="buttonPanelOne"></div>
         <div id="buttonPanelOneNTF"></div>
@@ -32,9 +51,14 @@ greenline.closest('.container')?.insertAdjacentHTML('afterend', `
         <div id="buttonPanelThree"></div>
     </div>
     <div id="secondaryActionArea" class="button-container flex-horizontal db-container"></div>
-</div>
+</nav>
 `)
-try { if (notEditMode) { document.getElementById('primaryNavigation')?.insertAdjacentElement('beforebegin', pageWrap); pageWrap?.classList.add('container') } }
+try {
+    if (notEditMode) {
+        document.querySelector('.primary-navigation')?.insertAdjacentElement('beforebegin', pageWrap);
+        pageWrap?.classList.add('container')
+    }
+}
 catch (error) { console.trace(error) }
 finally { document.documentElement.style.setProperty('--mainPanelMovedDown', '0') }
 let buttonDivOne = document.getElementById('buttonPanelOne');
@@ -46,7 +70,14 @@ let thisPageNameHtm = thisPageName + ".htm"
 let slashThisPageNameHtm = "/" + thisPageNameHtm
 if (("Welcome.htm").includes(thisPageNameHtm)) { location.assign("Alerts.htm") } //auto-redirect from Welcome to Alerts
 let reviewingEligibility = (thisPageNameHtm.indexOf("CaseEligibilityResult") > -1 && thisPageNameHtm.indexOf("CaseEligibilityResultSelection.htm") < 0)
-document.querySelectorAll('tbody').forEach((e) => { e.addEventListener('click', (event) => event.target.closest('tr').classList.add('selected')) }) //Fix for table entries losing selected class when clicked on. There is no way to know if a table shouldn't get the .selected class, so it does it for all.
+document.querySelectorAll('tbody').forEach((e) => {
+    e.addEventListener('click', (event) => {
+        if (event.target.closest('tr') && !event.target.closest('tr').classList.contains('selected') ) {
+            e.querySelector('.selected')?.classList.remove('selected')
+            event.target.closest('tr')?.classList.add('selected')
+        }
+    })
+}) //Fix for table entries losing selected class when clicked on. There is no way to know if a table shouldn't get the .selected class, so it does it for all.
 $("h4").click((e) => $(e.target).nextAll().toggleClass("hidden")) //Make all h4 clicky hidden
 
 function fGetCaseParameters() { // Parameters for navigating from Alerts or Lists, and the column
@@ -55,11 +86,7 @@ function fGetCaseParameters() { // Parameters for navigating from Alerts or List
         ["ClientSearch.htm", [document.querySelector('table#clientSearchProgramResults > tbody'), 1] ],
     ])
     let caseTableFromMap = caseTableMap.get(thisPageNameHtm) ?? [document.querySelector('table > tbody'), 1]
-    // let caseTable =
-    //     document.getElementById('caseOrProviderAlertsTable') ? [document.querySelector('table#caseOrProviderAlertsTable > tbody'), 3] :
-    //         document.getElementById('clientSearchProgramResults') ? [document.querySelector('table#clientSearchProgramResults > tbody'), 1] : [document.querySelector('table > tbody'), 1]
-    let parameter2alerts = caseTableFromMap[0].querySelector('tr > td:nth-of-type(2)') === null ? undefined : '?parm2=' + caseTableFromMap[0].querySelector('tr.selected > td:nth-of-type(' + caseTableFromMap[1] + ')')?.textContent
-    // let parameter2alerts = caseTable[0].querySelector('tr > td:nth-of-type(2)') === null ? undefined : '?parm2=' + caseTable[0].querySelector('tr.selected > td:nth-of-type(' + caseTable[1] + ')')?.textContent
+    let parameter2alerts = caseTableFromMap[0].querySelector('tr > td:nth-of-type(2)') === null ? undefined : '?parm2=' + caseTableFromMap[0].querySelector('tr.selected > td:nth-of-type(' + caseTableFromMap[1] + ') > a')?.textContent
     if (parameter2alerts === undefined) { return }
     let parameter3alerts = document.getElementById('periodBeginDate')?.value === undefined ? '' : '&parm3=' + document.getElementById('periodBeginDate')?.value.replace(/\//g, '') + document.getElementById('periodEndDate')?.value.replace(/\//g, '')
     return parameter2alerts + parameter3alerts
@@ -71,34 +98,29 @@ function fGetProviderParameters() {
         ["ProviderSearch.htm", [document.querySelector('table#providerSearchTable > tbody'), 1] ],
     ])
     let providerTableFromMap = providerTableMap.get(thisPageNameHtm) ?? undefined
-    // let providerTable =
-    //     document.getElementById('caseOrProviderAlertsTable') ? [document.querySelector('table#caseOrProviderAlertsTable > tbody'), 3] :
-    //         document.getElementById('providerRegistrationTable') ? [document.querySelector('table#providerRegistrationTable > tbody'), 2] :
-    //             document.getElementById('providerSearchTable') ? [document.querySelector('table#providerSearchTable > tbody'), 1] : undefined
     let parameter2alerts = providerTableFromMap[0].querySelector('tr > td:nth-of-type(2)') === null ? '' : '?providerId=' + providerTableFromMap[0].querySelector('tr.selected > td:nth-of-type(' + providerTableFromMap[1] + ')')?.textContent
-    // let parameter2alerts = providerTable[0].querySelector('tr > td:nth-of-type(2)') === null ? '' : '?providerId=' + providerTable[0].querySelector('tr.selected > td:nth-of-type(' + providerTable[1] + ')')?.textContent
     return parameter2alerts
 }
 // ================================================================================================
-//////////////////////////////// NAVIGATION_BUTTONS SECTION_START \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+// ////////////////////////////// NAVIGATION_BUTTONS SECTION_START \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 // ================================================================================================
 
 // ====================================================================================================
 // ///////////////////////////// PRIMARY_NAVIGATION_BUTTONS SECTION_START \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 // ====================================================================================================
-// const objectToMap = obj => { // https://www.tutorialspoint.com/convert-object-to-a-map-javascript
-//    const keys = Object.keys(obj);
-//    const map = new Map();
-//    for(let i = 0; i < keys.length; i++){
-//       //inserting new key value pair inside map
-//       map.set(keys[i], obj[keys[i]]);
-//    };
-//    return map;
-// };
 
 if (!iFramed) {
     try {
-        // SECTION_START Declaring navigation button arrays
+        // SECTION_START Declaring_navigation_button_arrays
+    // const objectToMap = obj => { // https://www.tutorialspoint.com/convert-object-to-a-map-javascript
+    //    const keys = Object.keys(obj);
+    //    const map = new Map();
+    //    for(let i = 0; i < keys.length; i++){
+    //       //inserting new key value pair inside map
+    //       map.set(keys[i], obj[keys[i]]);
+    //    };
+    //    return map;
+    // };
         const oRowOneButtons = { //Goto Buttons, objectGroupName: { buttonText: "Name as it appears on a button", gotoPage: "gotoPageName", opensIn: "_self or _blank", parentId: "Id of parent", buttonId: "Id of Button'],
             alerts: { buttonText: "Alerts", gotoPage: "Alerts", opensIn: "_self", parentId: "Alerts", buttonId: "AlertsSelf" },
             alertsPlus: { buttonText: "+", gotoPage: "Alerts", opensIn: "_blank", parentId: "Alerts", buttonId: "AlertsBlank" },
@@ -267,7 +289,7 @@ if (!iFramed) {
         }
 
         buttonDivOne.insertAdjacentHTML("beforeend", fRowOneButtonsString())
-        buttonDivOne.addEventListener('click', function (event) {//sends the gotoButtons array value 4 to gotoPage
+        buttonDivOne.addEventListener('click', function(event) {//sends the gotoButtons array value 4 to gotoPage
             if (event.target.closest('button')?.tagName?.toLowerCase() === 'button' && !(["FieldNotesNT", "FieldOverviewNT"]).includes(event.target.closest('button').id)) {
                 gotoPage(event.target.closest('button').id)
             }
@@ -282,7 +304,7 @@ if (!iFramed) {
         }
         if (notEditMode) {
             buttonDivTwo.insertAdjacentHTML("beforeend", fRow2ButtonsString())
-            buttonDivTwo.addEventListener('click', function (event) {// sends the oRowTwoButtons button ID
+            buttonDivTwo.addEventListener('click', function(event) {// sends the oRowTwoButtons button ID
                 if (notEditMode && event.target.tagName?.toLowerCase() === 'button') {
                     document.getElementById('buttonPanelThree').replaceChildren()
                     fRowThreeButtonsString(event.target.id)
@@ -341,11 +363,11 @@ if (!iFramed) {
             }
         }
 
-        document.querySelector('#primaryNavigation').addEventListener('click', (event) => {
+        document.querySelector('.primary-navigation').addEventListener('click', (event) => {
+            if (event.target.dataset.howToOpen === "_self") { document.querySelector('body').style.opacity = ".8" }
             if (event.target.tagName === 'BUTTON') {
                 if (event.target.parentNode.id !== "buttonPanelThree") { document.querySelectorAll('.cButton__nav__browsing').forEach((e) => e?.classList.remove('cButton__nav__browsing')) }
                 document.querySelector('.primary-navigation-row button#' + event.target.id + ':not(.cButton__nav__open-page):not(#buttonPanelOneNTF>button):not([data-how-to-open="_blank"])')?.classList.add("cButton__nav__browsing")
-                // $('.primary-navigation-row button#' + event.target.id + ':not(.cButton__nav__open-page):not(#buttonPanelOneNTF>button):not([data-how-to-open="_blank"])').addClass("cButton__nav__browsing")
                 if (document.querySelectorAll('#eligibilityButtons.cButton__nav__open-page, #eligibilityButtons.cButton__nav__browsing').length && !reviewingEligibility) {
                     document.querySelectorAll('#buttonPanelThree > button[id^="CaseEligibilityResult"]:not(#CaseEligibilityResultSelectionSelf)').forEach((e) => e?.classList.add('hidden'))
                 }
@@ -353,7 +375,7 @@ if (!iFramed) {
         })
         highlightPageAndCategory() // to highlight on page load
 
-        buttonDivThree.addEventListener('click', function (event) {
+        buttonDivThree.addEventListener('click', function(event) {
             if (notEditMode && event.target.tagName?.toLowerCase() === 'button') { gotoPage(event.target.id) }
         })
         // Activate row three from click or page load
@@ -386,23 +408,19 @@ if (!iFramed) {
         }
         // SECTION_START New_Tab_Case_Number_Field
         function newTabFieldButtons() {
-            // const openNotesOrOverview = [ // ["button text", "PageName", "ButtonID"]
-            //     ["Notes", "CaseNotes", "FieldNotesNT"],
-            //     ["Overview", "CaseOverview", "FieldOverviewNT"],
-            // ];
             let buttonDivOneNTF = document.getElementById("buttonPanelOneNTF")
             document.getElementById('buttonPanelOneNTF').insertAdjacentHTML('afterbegin', `
 <input id="newTabField" list="history" autocomplete="off" class="form-control" placeholder="Case #" style="width: 10ch;"></input>
 <button type="button" data-page-name="CaseNotes" id="FieldNotesNT" class="cButton cButton__nav">Notes</button>
 <button type="button" data-page-name="CaseOverview" id="FieldOverviewNT" class="cButton cButton__nav">Overview</button>
 `)
-            buttonDivOneNTF.addEventListener('click', function (event) {
+            buttonDivOneNTF.addEventListener('click', function(event) {
                 if (event.target.closest('button')?.tagName?.toLowerCase() === 'button' && (/\b\d{1,8}\b/).test(document.getElementById('newTabField').value)) {
                     event.preventDefault()
                     openCaseNumber(event.target.dataset.pageName, document.getElementById('newTabField').value)
                 }
             })
-            $('#newTabField').keydown(function (e) {
+            $('#newTabField').keydown(function(e) {
                 if (e.target.value.length > 7) {
                     e.stopImmediatePropagation()
                     if (!['ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'v', 'Home', 'End', 'a', 'z'].includes(e.key)) {
@@ -432,68 +450,78 @@ if (!iFramed) {
             };
         };
         newTabFieldButtons();
-        !notEditMode && ($('#buttonPanelTwo, #buttonPanelThree').hide()); // SECTION_END New_Tab_Case_Number_Field
+        !notEditMode && (document.querySelectorAll('#buttonPanelTwo, #buttonPanelThree').forEach((e) => e.classList.add('hidden') )); // SECTION_END New_Tab_Case_Number_Field
 
         // SECTION_START Reverse_Period_Options_order
         let selectPeriodToReverse = document.getElementById("selectPeriod");
         if (notEditMode && selectPeriodToReverse && !selectPeriodToReverse?.disabled) { selectPeriodReversal(selectPeriodToReverse) } // SECTION_END Reverse_Period_Options_order
     } catch (error) { console.trace(error) }
-}
+} // SECTION_END PRIMARY_NAVIGATION_BUTTONS
+//
+function selectPeriodReversal(selectPeriod) {
+    if (selectPeriod) {
+        $('#selectPeriod option').each(function() {
+            $(this).prependTo($(this).parent())
+        })
+    }
+};
 // ====================================================================================================
 // ///////////////////////////// PRIMARY_NAVIGATION_BUTTONS SECTION_END \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 // ====================================================================================================
 // SECTION_START Period_Dropdown_Next_Prev_Buttons
 function nextPrevPeriodButtons() {
     try {
-        let currentPeriod = document.querySelector('#selectPeriod').value
-        if (reviewingEligibility || thisPageNameHtm.indexOf("CaseApplicationInitiation.htm") > -1 || $('#submit').attr('disabled') === 'disabled') { return }
-        let lastAvailablePeriod = document.querySelector('#selectPeriod > option:first-child').value
-        let selectPeriodDropdown = document.getElementById('selectPeriod');
-        let selectPeriodParent = document.getElementById('selectPeriod').parentNode;
-        const buttonsNextPrev = [ //"Button Text", "ButtonId", "Next|Prev", "Stay|Go", "Left|Right - side of dropdown"]
-            ["«", "backGoSelect", "Prev", "Go", "Left"],
-            ["‹", "backSelect", "Prev", "Stay", "Right"],
-            ["»", "forwardGoSelect", "Next", "Go", "Right"],
-            ["›", "forwardSelect", "Next", "Stay", "Left"],
-        ];
-        for (let i = 0; i < buttonsNextPrev.length; i++) { //optimize
-            let btnNavigation = document.createElement('button');
-            btnNavigation.textContent = buttonsNextPrev[i][0];
-            btnNavigation.id = buttonsNextPrev[i][1];
-            btnNavigation.tabIndex = '-1';
-            btnNavigation.type = 'button';
-            btnNavigation.dataset.NextOrPrev = buttonsNextPrev[i][2]
-            btnNavigation.dataset.StayOrGo = buttonsNextPrev[i][3]
-            btnNavigation.className = 'npp-button'
-            buttonsNextPrev[i][2] === 'Prev' ? selectPeriodParent.insertBefore(btnNavigation, selectPeriodDropdown) : selectPeriodParent.insertBefore(btnNavigation, selectPeriodDropdown.nextSibling)
-        };
-        currentPeriod === lastAvailablePeriod && document.getElementById('forwardGoSelect').classList.add('cButton__disabled')
-        function checkPeriodMobility() {
-            document.querySelector('#selectPeriod').value === lastAvailablePeriod ? $('#forwardSelect').addClass('cButton__disabled') : $('#forwardSelect').removeClass('cButton__disabled')
-        }
-        checkPeriodMobility()
-
-        document.getElementById('selectPeriod').parentNode.addEventListener('click', function (event) {
-            if (event.target.closest('button')?.tagName.toLowerCase() === 'button') { selectNextPrev(event.target.closest('button').id) }
-        })
-        function selectNextPrev(clickedButton) { //Subtracting goes up/forward dates;
-            if (document.getElementById(clickedButton).dataset.NextOrPrev === "Next") {
-                if (selectPeriodDropdown.selectedIndex === 0) { // top of list
-                    if (document.getElementById(clickedButton).dataset.StayOrGo === "Go") { document.getElementById('caseInputSubmit').click(); return }
-                    else { return }
-                }
-                selectPeriodDropdown.selectedIndex--;
-                if (document.getElementById(clickedButton).dataset.StayOrGo === "Go") { document.getElementById('caseInputSubmit').click() }
-            } else if (document.getElementById(clickedButton).dataset.NextOrPrev === "Prev") {
-                selectPeriodDropdown.selectedIndex++;
-                if (document.getElementById(clickedButton).dataset.StayOrGo === "Go") { document.getElementById('caseInputSubmit').click() }
+        if (notEditMode) {
+            let currentPeriod = document.querySelector('#selectPeriod').value
+            if (reviewingEligibility || thisPageNameHtm.indexOf("CaseApplicationInitiation.htm") > -1 || $('#submit').attr('disabled') === 'disabled') { return }
+            let lastAvailablePeriod = document.querySelector('#selectPeriod > option:first-child').value
+            let selectPeriodDropdown = document.getElementById('selectPeriod');
+            let selectPeriodParent = document.getElementById('selectPeriod').parentNode;
+            const buttonsNextPrev = [ //"Button Text", "ButtonId", "Next|Prev", "Stay|Go", "Left|Right - side of dropdown"]
+                ["«", "backGoSelect", "Prev", "Go", "Left"],
+                ["‹", "backSelect", "Prev", "Stay", "Right"],
+                ["»", "forwardGoSelect", "Next", "Go", "Right"],
+                ["›", "forwardSelect", "Next", "Stay", "Left"],
+            ];
+            for (let i = 0; i < buttonsNextPrev.length; i++) { //optimize
+                let btnNavigation = document.createElement('button');
+                btnNavigation.textContent = buttonsNextPrev[i][0];
+                btnNavigation.id = buttonsNextPrev[i][1];
+                btnNavigation.tabIndex = '-1';
+                btnNavigation.type = 'button';
+                btnNavigation.dataset.NextOrPrev = buttonsNextPrev[i][2]
+                btnNavigation.dataset.StayOrGo = buttonsNextPrev[i][3]
+                btnNavigation.className = 'npp-button'
+                buttonsNextPrev[i][2] === 'Prev' ? selectPeriodParent.insertBefore(btnNavigation, selectPeriodDropdown) : selectPeriodParent.insertBefore(btnNavigation, selectPeriodDropdown.nextSibling)
+            };
+            currentPeriod === lastAvailablePeriod && document.getElementById('forwardGoSelect').classList.add('cButton__disabled')
+            function checkPeriodMobility() {
+                document.querySelector('#selectPeriod').value === lastAvailablePeriod ? $('#forwardSelect').addClass('cButton__disabled') : $('#forwardSelect').removeClass('cButton__disabled')
             }
             checkPeriodMobility()
-        };
+
+            document.getElementById('selectPeriod').parentNode.addEventListener('click', function(event) {
+                if (event.target.closest('button')?.tagName.toLowerCase() === 'button') { selectNextPrev(event.target.closest('button').id) }
+            })
+            function selectNextPrev(clickedButton) { //Subtracting goes up/forward dates;
+                if (document.getElementById(clickedButton).dataset.NextOrPrev === "Next") {
+                    if (selectPeriodDropdown.selectedIndex === 0) { // top of list
+                        if (document.getElementById(clickedButton).dataset.StayOrGo === "Go") { document.getElementById('caseInputSubmit').click(); return }
+                        else { return }
+                    }
+                    selectPeriodDropdown.selectedIndex--;
+                    if (document.getElementById(clickedButton).dataset.StayOrGo === "Go") { document.getElementById('caseInputSubmit').click() }
+                } else if (document.getElementById(clickedButton).dataset.NextOrPrev === "Prev") {
+                    selectPeriodDropdown.selectedIndex++;
+                    if (document.getElementById(clickedButton).dataset.StayOrGo === "Go") { document.getElementById('caseInputSubmit').click() }
+                }
+                checkPeriodMobility()
+            };
+        }
     } catch (error) { console.trace("nextPrevPeriodButtons", error) }
-}
-$('#selectPeriod:not([disabled], [readonly], [type=hidden])').length && nextPrevPeriodButtons() // SECTION_END Period_Dropdown_Next_Prev_Buttons
-queueMicrotask(() => {
-    document.querySelector('body')?.addEventListener('submit', function() { document.querySelector('body').style.opacity = ".8" }) // ?
-    document.querySelector('#primaryNavigation')?.addEventListener('click', function(e) { if (e.target.dataset.howToOpen === "_self") { document.querySelector('body').style.opacity = ".8" } })
-}) // Dim_Page_On_Traversal
+} // SECTION_END Period_Dropdown_Next_Prev_Buttons
+document.querySelector('#selectPeriod:not([disabled], [readonly], [type=hidden])') && nextPrevPeriodButtons() // SECTION_END Period_Dropdown_Next_Prev_Buttons
+queueMicrotask(() => { document.querySelector('body')?.addEventListener('submit', function() { document.querySelector('body').style.opacity = ".8" }) }) // Dim_Page_On_Submit
+// =================================================================================================================
+// SECTION_END CUSTOM_NAVIGATION  (THE MEC2NAVIGATION SCRIPT SHOULD MIMIC THE ABOVE)  SECTION_END NAVIGATION_BUTTONS
+// =================================================================================================================
