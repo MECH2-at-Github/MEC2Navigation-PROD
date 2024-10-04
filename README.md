@@ -7,11 +7,13 @@ Install instructions:
 4. Done!
 
 # Features
-* Navigation buttons added to the top of MEC2
-  * [+] buttons open the page in a new tab.
-  * Buttons will highlight the current category and page in blue.
-  * Buttons can also be used to navigate when on the Alerts and Provider or CaseList pages. Click a provider or case row, then click a navigation button.
-* 'Open in a new tab' Case number field, along with two destination pages (Notes, Overview) at the top right of the Navigation buttons
+Primary Navigation buttons:
+  * 3 rows of buttons are available to navigate MEC2. All buttons can be used to open a page in a new tab by right clicking on the button.
+  * Row 1: Static, directly opens a page. The [ Case # ] field on the right is for a case number, and clicking [ Notes ] or [ Overview ] buttons opens the respective page in a new tab. Pressing enter opens CaseOverview.
+  * Row 2: (Categories) Static, loads row 3 buttons. Does not directly open a page.
+  * Row 3: (Page) Dynamic based on row 2 button. Directly opens a page.
+	  * On page load, the category button and page button are highlighted.
+* 'Opens in new tab' Case number field, along with two destination pages (Notes, Overview) at the top right of the Navigation buttons
   * Pressing enter after typing a case number selects 'CaseOverview'
 * Period navigation buttons change periods without the select dropdown
   * « ‹ [Daterange - Dropdown] › »   (Previous+Submit, Previous [Dropdown] Next, Next+Submit)
